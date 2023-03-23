@@ -1,22 +1,38 @@
+mod craiyon;
+mod scp;
+
+use anyhow::Result;
 use rust_bert::pipelines::question_answering::{QaInput, QuestionAnsweringModel};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+use crate::{craiyon::Craiyon, scp::Scp};
+
+fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+
     let qa_model = QuestionAnsweringModel::new(Default::default())?;
 
-    let question = String::from("what does this SCP resemble?");
-    let context = String::from(SCP);
+    let Scp { description, .. } = Scp::scrape(2)?;
 
     let answer = qa_model
-        .predict(&[QaInput { question, context }], 1, 64)
+        .predict(
+            &[QaInput {
+                question: String::from("what does this SCP resemble?"),
+                context: description,
+            }],
+            1,
+            64,
+        )
         .pop()
         .unwrap()
         .pop()
         .unwrap()
         .answer;
 
-    println!("{}", answer);
+    tracing::info!(?answer);
+
+    tracing::info!("drawing image (this may take over a minute)...");
+    let image = Craiyon::draw(&answer)?.image()?;
+    std::fs::write("image.webp", image)?;
 
     Ok(())
 }
-
-const SCP: &str = r#"SCP-096 is a humanoid creature measuring approximately 2.38 meters in height. Subject shows very little muscle mass, with preliminary analysis of body mass suggesting mild malnutrition. Arms are grossly out of proportion with the rest of the subject's body, with an approximate length of 1.5 meters each. Skin is mostly devoid of pigmentation, with no sign of any body hair."#;
